@@ -29,29 +29,25 @@ impl Default for OptimizeOpts<'static> {
     fn default() -> Self {
         Self {
             host: "e_coli",
-            avoid: &["GGTCTC", "CGTCTC", "GAGACC", "GAGACG"], // BsaI / BsmBI approximate
+            avoid: &["GGTCTC", "CGTCTC", "GAGACC", "GAGACG"],
             gc_min: 0.3,
             gc_max: 0.7,
         }
     }
 }
 
-/// Optimise a coding sequence (must be length % 3 == 0, DNA, uppercase).
+/// Optimise a coding sequence (must be length % 3 == 0, DNA).
 pub fn optimize_cds(seq: &str, opts: &OptimizeOpts) -> Result<String, OptimizeError> {
     let seq = normalise(seq);
     if seq.len() % 3 != 0 {
         return Err(OptimizeError::BadLength);
     }
 
-    let codons: Vec<&str> = seq
-        .as_bytes()
-        .chunks(3)
-        .map(|c| std::str::from_utf8(c).unwrap_or("NNN"))
-        .collect();
-
     let mut out = String::with_capacity(seq.len());
+    let n = seq.len() / 3;
 
-    for (i, codon) in codons.iter().enumerate() {
+    for i in 0..n {
+        let codon = &seq[i * 3..i * 3 + 3];
         let aa = translate_codon(codon).ok_or(OptimizeError::UnknownCodon(i * 3))?;
         let candidates = synonymous_codons(aa, opts.host);
         if candidates.is_empty() {
@@ -63,12 +59,9 @@ pub fn optimize_cds(seq: &str, opts: &OptimizeOpts) -> Result<String, OptimizeEr
         out.push_str(chosen);
     }
 
-    // Soft GC adjustment: if outside range, try swapping a few codons to alternatives
-    // that move GC in the right direction without reintroducing patterns.
     if let Some(adjusted) = adjust_gc(&out, opts) {
         return Ok(adjusted);
     }
-
     Ok(out)
 }
 
@@ -88,12 +81,11 @@ fn normalise(s: &str) -> String {
         .collect()
 }
 
-fn choose_codon(candidates: &[&str], prefix: &str, avoid: &[&str]) -> Option<&'static str> {
+fn choose_codon<'a>(candidates: &[&'a str], prefix: &str, avoid: &[&str]) -> Option<&'a str> {
     for c in candidates {
         let trial = format!("{prefix}{c}");
         if !contains_any(&trial, avoid) {
-            // Safety: candidates are 'static
-            return Some(unsafe { std::mem::transmute::<&str, &'static str>(c) });
+            return Some(*c);
         }
     }
     None
@@ -109,10 +101,8 @@ fn adjust_gc(seq: &str, opts: &OptimizeOpts) -> Option<String> {
         return None;
     }
     let want_higher = gc < opts.gc_min;
-    let mut codons: Vec<String> = seq
-        .as_bytes()
-        .chunks(3)
-        .map(|c| String::from_utf8_lossy(c).into_owned())
+    let mut codons: Vec<String> = (0..seq.len() / 3)
+        .map(|i| seq[i * 3..i * 3 + 3].to_string())
         .collect();
 
     for i in 0..codons.len() {
@@ -124,11 +114,7 @@ fn adjust_gc(seq: &str, opts: &OptimizeOpts) -> Option<String> {
             }
             let alt_gc = alt.chars().filter(|c| *c == 'G' || *c == 'C').count();
             let cur_gc = codons[i].chars().filter(|c| *c == 'G' || *c == 'C').count();
-            let improves = if want_higher {
-                alt_gc > cur_gc
-            } else {
-                alt_gc < cur_gc
-            };
+            let improves = if want_higher { alt_gc > cur_gc } else { alt_gc < cur_gc };
             if !improves {
                 continue;
             }
@@ -140,7 +126,6 @@ fn adjust_gc(seq: &str, opts: &OptimizeOpts) -> Option<String> {
                 if new_gc >= opts.gc_min && new_gc <= opts.gc_max {
                     return Some(trial);
                 }
-                // keep the improvement and continue
             } else {
                 codons[i] = old;
             }
