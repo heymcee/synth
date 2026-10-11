@@ -2,29 +2,30 @@
 
 **Design studio / sequence optimization room.**
 
-For biodesign agent use. Optimises sequence parameters for synthesis constraints and host expression.
+Systems engineering in **Rust**. Optimises Seek frames for synthesis constraints and host expression.
 
 | Item | Value |
 |------|--------|
 | Type | design studio / environment |
 | Purpose | sequence optimization room |
-| Input | Seek frame (preferred) or sequence `.fasta` from sequence card |
+| Language | Rust (systems) |
+| Input | Seek frame (preferred) or sequence `.fasta` |
 | Process | OPTIMISE sequence parameters FOR (synthesis, host) |
 | Output | optimised Seek frame or `.fasta` |
-| Engine | [DNA Chisel](https://github.com/Edinburgh-Genome-Foundry/DnaChisel) (Edinburgh Genome Foundry) |
+| Method | Most-frequent synonymous codon (local CAI) + pattern avoidance + GC bounds |
 | Gate | Final designs **must** pass [bloc](https://github.com/wetware-hq/bloc) before synthesis |
 
 ## Organization tools
 
-| Repo | Role |
-|------|------|
-| [seek](https://github.com/wetware-hq/seek) | Canonical sequence representation (frame JSON) |
-| **synth** (this repo) | Optimise frame for host + synthesis constraints |
-| [bloc](https://github.com/wetware-hq/bloc) | Biosecurity suppressor; release policy |
-| [bindi](https://github.com/wetware-hq/bindi) | Protein binder design / curation |
-| [captaincook](https://github.com/wetware-hq/captaincook) | Wetware Sydney head engineer (structure, design, clinical context) |
+| Repo | Role | Language |
+|------|------|----------|
+| [seek](https://github.com/wetware-hq/seek) | Canonical sequence representation (frame JSON) | Python |
+| **synth** (this repo) | Optimise frame for host + synthesis constraints | **Rust** |
+| [bloc](https://github.com/wetware-hq/bloc) | Biosecurity suppressor; release policy | Rust |
+| [bindi](https://github.com/wetware-hq/bindi) | Protein binder design / curation | Python |
+| [captaincook](https://github.com/wetware-hq/captaincook) | Wetware Sydney head engineer | Python |
 
-Pipeline for a coding sequence intended for synthesis:
+Pipeline:
 
 ```
 seek frame (filled)  →  synth  →  optimised frame
@@ -32,43 +33,40 @@ seek frame (filled)  →  synth  →  optimised frame
                     bloc design specification  →  bloc screen  →  card
 ```
 
-synth does **not** set release policy. Absence of a bloc `RELEASE` is not clearance.
-
-## Agent contract
-
-See [AGENTS.md](AGENTS.md). Hosts must treat Seek frames as the primary sequence card and must route any synthesis path through `bloc screen`.
+synth does **not** set release policy.
 
 ## Quick start
 
 ```bash
-pip install -e .
-# or: pip install dnachisel biopython
-
-# Seek frame (preferred)
-python -m synth.optimize examples/gfp_frame.json --host e_coli_k12 -o optimised.json
-
-# FASTA (convenience)
-python -m synth.optimize input.fasta --host yeast -o optimized.fasta
+cargo build --release
+./target/release/synth examples/gfp_frame.json --host e_coli_k12 -o optimised.json
+./target/release/synth input.fasta --host yeast -o optimized.fasta
 ```
 
-Default problem: `EnforceTranslation` + avoid BsaI/BsmBI + GC 0.3–0.7 + `CodonOptimize` for the host.
+Default: most-frequent codon for the host, avoid BsaI/BsmBI sites (`GGTCTC`, `GAGACC`, `CGTCTC`, `GAGACG`), GC 0.3–0.7, preserve translation (standard code).
 
-Chassis mapping (bloc → DNA Chisel): `e_coli_k12`/`e_coli_b` → `e_coli`, `yeast` → `s_cerevisiae`, `human` → `h_sapiens`.
+Chassis mapping: `e_coli_k12` / `e_coli_b` → `e_coli`, `yeast` → `s_cerevisiae`, `human` → `h_sapiens`.
 
-## Schema
+## Layout
 
-- Request: [`schema/optimize_request.schema.json`](schema/optimize_request.schema.json)
-- Frame: https://github.com/wetware-hq/seek/blob/main/schema/frame.schema.json
+```
+src/
+  main.rs       CLI (Seek frame or FASTA)
+  codon.rs      genetic code + preferred codon tables
+  optimize.rs   CAI-style optimisation + pattern/GC handling
+schema/
+examples/
+AGENTS.md       host contract
+```
+
+A Python DNA Chisel prototype remains under `synth/` for reference; the systems path is the Rust binary.
 
 ## Status
 
-v0.1 skeleton. License: MIT.
-
-Wet-laboratory execution is out of process.
+v0.1. License: MIT. Wet-laboratory execution is out of process.
 
 ## References
 
-- DNA Chisel: https://edinburgh-genome-foundry.github.io/DnaChisel/
-- EGF Codons suite: https://edinburgh-genome-foundry.github.io/
 - Seek: https://github.com/wetware-hq/seek
 - bloc: https://github.com/wetware-hq/bloc
+- EGF DNA Chisel (design reference): https://github.com/Edinburgh-Genome-Foundry/DnaChisel
