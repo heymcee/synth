@@ -1,8 +1,6 @@
 //! Standard genetic code and preferred-codon tables.
 //! Preferred codons maximise local CAI (most frequent synonymous codon).
 
-use std::collections::HashMap;
-
 /// NCBI standard code (table 1) codon → amino acid (one-letter; '*' stop).
 pub fn translate_codon(codon: &str) -> Option<char> {
     Some(match codon {
@@ -32,15 +30,9 @@ pub fn translate_codon(codon: &str) -> Option<char> {
 }
 
 /// Preferred (most frequent) codon per amino acid for a host.
-/// Sources: Kazusa / highly expressed gene tables commonly used for CAI.
 pub fn preferred_codon(aa: char, host: &str) -> Option<&'static str> {
-    let table = match host {
-        "e_coli" | "ecoli" | "e_coli_k12" | "e_coli_b" | "cell_free" | "other_bsl1" | "other" | "none" => ECO,
-        "yeast" | "s_cerevisiae" => YEAST,
-        "human" | "h_sapiens" => HUMAN,
-        _ => ECO,
-    };
-    table.get(&aa).copied()
+    let table = host_table(host);
+    table.iter().find(|(k, _)| *k == aa).map(|(_, v)| *v)
 }
 
 /// Alternative synonymous codons (preferred first) for pattern avoidance.
@@ -57,6 +49,15 @@ pub fn synonymous_codons(aa: char, host: &str) -> Vec<&'static str> {
         }
     }
     out
+}
+
+fn host_table(host: &str) -> &'static [(char, &'static str)] {
+    match host {
+        "e_coli" | "ecoli" | "e_coli_k12" | "e_coli_b" | "cell_free" | "other_bsl1" | "other" | "none" => ECO,
+        "yeast" | "s_cerevisiae" => YEAST,
+        "human" | "h_sapiens" => HUMAN,
+        _ => ECO,
+    }
 }
 
 fn all_codons_for(aa: char) -> Vec<&'static str> {
@@ -86,8 +87,8 @@ fn all_codons_for(aa: char) -> Vec<&'static str> {
     }
 }
 
-// Most frequent codon (CAI method) — E. coli highly expressed
-const ECO: &[ (char, &str) ] = &[
+// Most frequent codon (CAI method) — E. coli highly expressed (Kazusa-style)
+const ECO: &[(char, &str)] = &[
     ('A', "GCG"), ('C', "TGC"), ('D', "GAT"), ('E', "GAA"), ('F', "TTT"),
     ('G', "GGC"), ('H', "CAT"), ('I', "ATT"), ('K', "AAA"), ('L', "CTG"),
     ('M', "ATG"), ('N', "AAC"), ('P', "CCG"), ('Q', "CAG"), ('R', "CGT"),
@@ -95,7 +96,7 @@ const ECO: &[ (char, &str) ] = &[
     ('*', "TAA"),
 ];
 
-const YEAST: &[ (char, &str) ] = &[
+const YEAST: &[(char, &str)] = &[
     ('A', "GCT"), ('C', "TGT"), ('D', "GAT"), ('E', "GAA"), ('F', "TTT"),
     ('G', "GGT"), ('H', "CAT"), ('I', "ATT"), ('K', "AAA"), ('L', "TTG"),
     ('M', "ATG"), ('N', "AAT"), ('P', "CCA"), ('Q', "CAA"), ('R', "AGA"),
@@ -103,24 +104,10 @@ const YEAST: &[ (char, &str) ] = &[
     ('*', "TAA"),
 ];
 
-const HUMAN: &[ (char, &str) ] = &[
+const HUMAN: &[(char, &str)] = &[
     ('A', "GCC"), ('C', "TGC"), ('D', "GAC"), ('E', "GAG"), ('F', "TTC"),
     ('G', "GGC"), ('H', "CAC"), ('I', "ATC"), ('K', "AAG"), ('L', "CTG"),
     ('M', "ATG"), ('N', "AAC"), ('P', "CCC"), ('Q', "CAG"), ('R', "CGC"),
     ('S', "AGC"), ('T', "ACC"), ('V', "GTG"), ('W', "TGG"), ('Y', "TAC"),
     ('*', "TGA"),
 ];
-
-fn table_get(table: &[(char, &str)], aa: &char) -> Option<&'static str> {
-    table.iter().find(|(k, _)| k == aa).map(|(_, v)| *v)
-}
-
-// Re-export as HashMap-like accessors used above
-trait Table {
-    fn get(&self, aa: &char) -> Option<&'static str>;
-}
-impl Table for &[(char, &str)] {
-    fn get(&self, aa: &char) -> Option<&'static str> {
-        table_get(self, aa)
-    }
-}
