@@ -2,8 +2,8 @@
 
 ## 0.1.0
 
-- Initial skeleton: DNA Chisel wrapper for host codon optimisation + basic synthesis constraints.
-- Seek frame support (preferred input) and FASTA convenience path.
-- Chassis mapping aligned with bloc (`e_coli_k12`, `yeast`, …).
-- AGENTS.md contract: synth does not set release policy; route through bloc.
-- Schema for optimise request.
+- Systems path in Rust: CLI, genetic code, preferred-codon tables (E. coli, yeast, human), pattern avoidance, soft GC bounds.
+- Seek frame support (preferred) and FASTA convenience path.
+- Chassis mapping aligned with bloc.
+- AGENTS.md: synth does not set release policy; route through bloc.
+- Python DNA Chisel prototype retained for reference only.
