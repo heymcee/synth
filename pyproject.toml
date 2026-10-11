@@ -1,0 +1,25 @@
+[project]
+name = "synth"
+version = "0.1.0"
+description = "Design studio / sequence optimization room for biodesign agents. Optimises Seek frames for synthesis and host using DNA Chisel."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "Wetware"}]
+dependencies = [
+  "dnachisel>=3.2",
+  "biopython>=1.81",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
+[project.scripts]
+synth = "synth.optimize:main"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
